@@ -216,4 +216,19 @@ void Colonist::Update(float delta, TileMap& map, GlobalResources& globalRes,
             }
         }
     }
+    
+    if (state == ColonistState::Idle) {
+        int tileX = (int)(position.x / map.tileSize);
+        int tileY = (int)(position.y / map.tileSize);
+        if (map.tiles[tileY * map.width + tileX] == TileMap::TileType::FrozenLake) {
+            state = ColonistState::Fishing;
+            fishingTimer = 0.0f;
+        }
+    } else if (state == ColonistState::Fishing) {
+        fishingTimer += delta;
+        if (fishingTimer > 3.0f) { // 3 seconds to fish
+            globalRes.food += 1; // Add food resource (add this to GlobalResources if not present)
+            state = ColonistState::Idle;
+        }
+    }
 }

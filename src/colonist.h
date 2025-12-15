@@ -8,6 +8,7 @@ class Building; // Forward declaration
 struct GlobalResources {
     int wood = 0;
     int stone = 0;
+    int food = 0; // Add this line
 };
 
 enum class ColonistState {
@@ -15,7 +16,8 @@ enum class ColonistState {
     Gathering,
     Seeking,      // Seeking warmth or shelter
     Resting,      // Resting in hut
-    Dead
+    Dead,
+    Fishing
 };
 
 class Colonist {
@@ -35,7 +37,10 @@ public:
     float restTimer = 0.0f;
     Building* currentBuilding = nullptr; // Building colonist is inside
 
-    Colonist(float x, float y) : position{x, y}, destination{x, y}, speed(100.0f) {}
+
+    float fishingTimer = 0.0f;
+
+    Colonist(float x, float y) : position{x, y}, destination{x, y}, speed(100.0f), fishingTimer(0.0f) {}
 
     void SetDestination(Vector2 dest, bool isPlayerOrder = false) {
         destination = dest;

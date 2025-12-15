@@ -131,6 +131,16 @@ public:
                 }
             }
         }
+        for (int y = 0; y < height; ++y) {
+            for (int x = 0; x < width; ++x) {
+                // Example: 5% chance for a frozen lake tile
+                if (GetRandomValue(0, 99) < 5) {
+                    tiles[y * width + x] = TileType::FrozenLake;
+                } else {
+                    tiles[y * width + x] = TileType::Snow;
+                }
+            }
+        }
     }
 
     ResourceType GetResourceAt(int x, int y) const {

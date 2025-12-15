@@ -3,7 +3,7 @@
 #include "colonist.h"
 #include "tilemap.h"
 #include "building.h"
-
+#include <algorithm>
 
 int main() 
 {
@@ -12,7 +12,7 @@ int main()
     constexpr int screenWidth = 800;
     constexpr int screenHeight = 600;
     
-    Colonist colonist(400, 300);
+    std::vector<Colonist> colonists = { Colonist(400, 300) };
     TileMap map(50, 38, 32); // Larger map: 50x38 tiles, 32px each (1600x1216)
     GlobalResources globalRes;
     
@@ -22,7 +22,7 @@ int main()
     
     // Setup camera
     Camera2D camera = { 0 };
-    camera.target = { colonist.position.x, colonist.position.y };
+    camera.target = { colonists[0].position.x, colonists[0].position.y };
     camera.offset = { screenWidth / 2.0f, screenHeight / 2.0f };
     camera.rotation = 0.0f;
     camera.zoom = 1.0f;
@@ -60,11 +60,17 @@ int main()
         const int panelX = 0, panelY = 0, panelW = 250, panelH = 160;
         Rectangle uiBounds = {(float)panelX, (float)panelY, (float)panelW, (float)panelH};
         
-        colonist.Update(delta, map, globalRes, buildings, uiBounds, &camera, buildMode);
+        // Update all colonists
+        for (auto& colonist : colonists) {
+            colonist.Update(delta, map, globalRes, buildings, uiBounds, &camera, buildMode);
+        }
 
-        // Restart on death
-        if (colonist.state == ColonistState::Dead && IsKeyPressed(KEY_R)) {
-            colonist = Colonist(400, 300);
+        // Restart logic: only if all colonists are dead
+        bool allDead = std::all_of(colonists.begin(), colonists.end(),
+                                   [](const Colonist& c){ return c.state == ColonistState::Dead; });
+        if (allDead && IsKeyPressed(KEY_R)) {
+            colonists.clear();
+            colonists.push_back(Colonist(400, 300));
             buildings.clear();
             globalRes.wood = 0;
             globalRes.stone = 0;
@@ -137,7 +143,10 @@ int main()
                                 Fade(bp.color, 0.5f));
                 }
                 
-                colonist.Draw();
+                // Draw all colonists
+                for (const auto& colonist : colonists) {
+                    colonist.Draw();
+                }
             EndMode2D();
 
             // UI panel (screen space - not affected by camera)
@@ -146,12 +155,13 @@ int main()
             DrawText("Colony Resources", panelX + 10, panelY + 8, 18, WHITE);
             DrawText(TextFormat("Wood: %d", globalRes.wood), panelX + 10, panelY + 30, 18, BROWN);
             DrawText(TextFormat("Stone: %d", globalRes.stone), panelX + 130, panelY + 30, 18, LIGHTGRAY);
+            DrawText(TextFormat("Food: %d", globalRes.food), panelX + 10, panelY + 50, 18, DARKGREEN);
             
-            // Building menu
-            DrawText("Buildings: (B to toggle build mode)", panelX + 10, panelY + 52, 14, WHITE);
+            // Move build menu down to avoid overlap
+            DrawText("Buildings: (B to toggle build mode)", panelX + 10, panelY + 72, 14, WHITE);
             for (int i = 0; i < NUM_BUILDING_TYPES; i++) {
                 const BuildingBlueprint& bp = BUILDING_BLUEPRINTS[i];
-                int btnY = panelY + 70 + i * 25;
+                int btnY = panelY + 90 + i * 25; // was 70, now 90
                 bool canAfford = globalRes.wood >= bp.woodCost && globalRes.stone >= bp.stoneCost;
                 bool isSelected = (i == selectedBuildingType && buildMode);
                 
@@ -168,34 +178,42 @@ int main()
             DrawRectangle(statusX, statusY, 250, 100, Fade(GRAY, 0.9f));
             DrawRectangleLines(statusX, statusY, 250, 100, DARKGRAY);
             
+            const Colonist* statusColonist = &colonists[0];
+            auto it = std::find_if(colonists.begin(), colonists.end(),
+                                   [](const Colonist& c){ return c.state != ColonistState::Dead; });
+            if (it != colonists.end()) {
+                statusColonist = &(*it);
+            }
+            
             const char* stateText = "IDLE";
             Color stateColor = WHITE;
-            switch (colonist.state) {
+            switch (statusColonist->state) {
                 case ColonistState::Gathering: stateText = "GATHERING"; stateColor = GREEN; break;
                 case ColonistState::Seeking: stateText = "SEEKING WARMTH"; stateColor = ORANGE; break;
                 case ColonistState::Resting: stateText = "RESTING"; stateColor = PURPLE; break;
                 case ColonistState::Dead: stateText = "DEAD"; stateColor = RED; break;
+                case ColonistState::Fishing: stateText = "FISHING"; stateColor = SKYBLUE; break;
                 default: stateText = "IDLE"; stateColor = WHITE; break;
             }
             
             DrawText(TextFormat("Colonist: %s", stateText), statusX + 10, statusY + 8, 16, stateColor);
             DrawText("Warmth:", statusX + 10, statusY + 30, 14, WHITE);
             DrawRectangle(statusX + 80, statusY + 30, 150, 14, DARKGRAY);
-            DrawRectangle(statusX + 80, statusY + 30, 150 * (colonist.warmth / 100.0f), 14, RED);
-            DrawText(TextFormat("%.0f%%", colonist.warmth), statusX + 235, statusY + 30, 12, WHITE);
+            DrawRectangle(statusX + 80, statusY + 30, 150 * (statusColonist->warmth / 100.0f), 14, RED);
+            DrawText(TextFormat("%.0f%%", statusColonist->warmth), statusX + 235, statusY + 30, 12, WHITE);
             
             DrawText("Hunger:", statusX + 10, statusY + 48, 14, WHITE);
             DrawRectangle(statusX + 80, statusY + 48, 150, 14, DARKGRAY);
-            DrawRectangle(statusX + 80, statusY + 48, 150 * (colonist.hunger / 100.0f), 14, ORANGE);
-            DrawText(TextFormat("%.0f%%", colonist.hunger), statusX + 235, statusY + 48, 12, WHITE);
+            DrawRectangle(statusX + 80, statusY + 48, 150 * (statusColonist->hunger / 100.0f), 14, ORANGE);
+            DrawText(TextFormat("%.0f%%", statusColonist->hunger), statusX + 235, statusY + 48, 12, WHITE);
             
             DrawText("Energy:", statusX + 10, statusY + 66, 14, WHITE);
             DrawRectangle(statusX + 80, statusY + 66, 150, 14, DARKGRAY);
-            DrawRectangle(statusX + 80, statusY + 66, 150 * (colonist.energy / 100.0f), 14, SKYBLUE);
-            DrawText(TextFormat("%.0f%%", colonist.energy), statusX + 235, statusY + 66, 12, WHITE);
+            DrawRectangle(statusX + 80, statusY + 66, 150 * (statusColonist->energy / 100.0f), 14, SKYBLUE);
+            DrawText(TextFormat("%.0f%%", statusColonist->energy), statusX + 235, statusY + 66, 12, WHITE);
             
             // Death message
-            if (colonist.state == ColonistState::Dead) {
+            if (statusColonist->state == ColonistState::Dead) {
                 DrawRectangle(screenWidth / 2 - 150, screenHeight / 2 - 50, 300, 100, Fade(BLACK, 0.8f));
                 DrawText("COLONIST DIED!", screenWidth / 2 - 80, screenHeight / 2 - 30, 24, RED);
                 DrawText("Press R to restart", screenWidth / 2 - 70, screenHeight / 2 + 10, 16, WHITE);

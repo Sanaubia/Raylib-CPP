@@ -15,7 +15,7 @@
 			"array": "cpp",
 			"atomic": "cpp",
 			"*.tcc": "cpp",
-			"cctype": "cpp",
+			"cctype": "cpp", 
 			"clocale": "cpp",
 			"cmath": "cpp",
 			"cstdarg": "cpp",
